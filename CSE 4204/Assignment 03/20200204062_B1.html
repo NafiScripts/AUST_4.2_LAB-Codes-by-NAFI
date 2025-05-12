@@ -1,0 +1,175 @@
+<html>
+<title>RAFIUL_AWAL_3D Octahedron</title>
+<canvas id="webglcanvas" width="500" height="500"></canvas>
+
+<script>
+    // Get the canvas element and set up WebGL context
+    var canvas = document.getElementById("webglcanvas");
+    var gl = canvas.getContext("webgl");
+
+    // Vertex shader program source
+    var vertexShaderSource = `
+        attribute vec3 a_coords; // Vertex position attribute
+        attribute vec3 a_color;  // Color attribute for each vertex
+        uniform mat4 u_RotY;     // Uniform matrix for Y-axis rotation
+        uniform mat4 u_RotX;     // Uniform matrix for X-axis rotation
+        varying vec3 v_color;    // Varying variable to pass color to the fragment shader
+        uniform float u_scalingFactor; // Uniform scaling factor
+        void main() {
+            // Apply rotation and scaling to the vertex position
+            vec4 temp = u_RotY * u_RotX * vec4(a_coords * u_scalingFactor, 1.0);
+            gl_Position = temp;   // Set the final position of the vertex
+            v_color = a_color;    // Pass the color to the fragment shader
+        }`;
+
+    // Fragment shader program source
+    var fragmentShaderSource = `
+        precision mediump float; // Set the default precision for floating point operations
+        varying vec3 v_color;    // Receive the color from the vertex shader
+        void main() {
+            gl_FragColor = vec4(v_color, 1.0); // Set the pixel color based on the vertex color
+        }`;
+
+    // Create and compile the vertex shader
+    var vsh = gl.createShader(gl.VERTEX_SHADER);
+    gl.shaderSource(vsh, vertexShaderSource);
+    gl.compileShader(vsh);
+
+    // Create and compile the fragment shader
+    var fsh = gl.createShader(gl.FRAGMENT_SHADER);
+    gl.shaderSource(fsh, fragmentShaderSource);
+    gl.compileShader(fsh);
+
+    // Create and link the shader program
+    var prog = gl.createProgram();
+    gl.attachShader(prog, vsh);
+    gl.attachShader(prog, fsh);
+    gl.linkProgram(prog);
+    gl.useProgram(prog);
+
+    // Get the attribute locations for vertex positions and colors
+    var a_coords_location = gl.getAttribLocation(prog, "a_coords");
+    var a_color_location = gl.getAttribLocation(prog, "a_color");
+
+    // Coordinates for the octahedron vertices
+    var coords = new Float32Array([
+        0.0,  0.5,  0.0,  // Top vertex
+        -0.5,  0.0,  0.0, // Left vertex
+         0.5,  0.0,  0.0, // Right vertex
+         0.0,  0.0,  0.5, // Front vertex
+         0.0,  0.0, -0.5, // Back vertex
+         0.0, -0.5,  0.0  // Bottom vertex
+    ]);
+
+    // Colors for each vertex
+    var colors = new Float32Array([
+        1.0, 0.0, 0.0, // Red for top vertex
+        0.0, 1.0, 0.0, // Green for left vertex
+        0.0, 0.0, 1.0, // Blue for right vertex
+        1.0, 1.0, 0.0, // Yellow for front vertex
+        1.0, 0.0, 1.0, // Magenta for back vertex
+        0.0, 1.0, 1.0  // Cyan for bottom vertex
+    ]);
+
+    // Indices defining the faces of the octahedron
+    var indices = new Uint8Array([
+        0, 1, 3, // Top front-left face
+        0, 3, 2, // Top front-right face
+        0, 2, 4, // Top back-right face
+        0, 4, 1, // Top back-left face
+        5, 3, 1, // Bottom front-left face
+        5, 2, 3, // Bottom front-right face
+        5, 4, 2, // Bottom back-right face
+        5, 1, 4  // Bottom back-left face
+    ]);
+
+    // Create and bind the buffer for vertex positions
+    var coordsBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, coordsBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, coords, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(a_coords_location, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_coords_location);
+
+    // Create and bind the buffer for vertex colors
+    var colorBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, colors, gl.STATIC_DRAW);
+    gl.vertexAttribPointer(a_color_location, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(a_color_location);
+
+    // Create and bind the buffer for indices (element array)
+    var indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+    // Get the uniform locations for rotation and scaling
+    var u_RotY_location = gl.getUniformLocation(prog, "u_RotY");
+    var u_RotX_location = gl.getUniformLocation(prog, "u_RotX");
+    var u_scalingFactor_location = gl.getUniformLocation(prog, "u_scalingFactor");
+
+    // Initial rotation angles and scaling factor
+    var thetaY = 0;
+    var thetaX = 0;
+    var scalingFactor = 1.0;
+    var rotation_angle = 5;
+
+    // Function to update the rotation matrices based on the current angles
+    function updateRotationMatrices() {
+        var radY = thetaY * Math.PI / 180;
+        var rotateYMatrix = new Float32Array([
+            Math.cos(radY),  0.0, -Math.sin(radY),  0.0,
+            0.0,            1.0,  0.0,            0.0,
+            Math.sin(radY),  0.0,  Math.cos(radY),  0.0,
+            0.0,            0.0,  0.0,            1.0
+        ]);
+        gl.uniformMatrix4fv(u_RotY_location, false, rotateYMatrix);
+
+        var radX = thetaX * Math.PI / 180;
+        var rotateXMatrix = new Float32Array([
+            1.0,  0.0,            0.0,            0.0,
+            0.0,  Math.cos(radX),  Math.sin(radX),  0.0,
+            0.0, -Math.sin(radX),  Math.cos(radX),  0.0,
+            0.0,  0.0,            0.0,            1.0
+        ]);
+        gl.uniformMatrix4fv(u_RotX_location, false, rotateXMatrix);
+    }
+
+    // Function to draw the octahedron
+    function drawOctahedron() {
+        gl.clearColor(1.0, 1.0, 1.0, 1.0); // Set background color
+        gl.enable(gl.DEPTH_TEST); // Enable depth testing
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); // Clear the buffer
+        gl.uniform1f(u_scalingFactor_location, scalingFactor); // Set the scaling factor
+        gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_BYTE, 0); // Draw the octahedron
+    }
+
+    // Event listener for key presses to control rotation and scaling
+    window.onkeydown = function(event) {
+        switch (event.key) {
+            case "ArrowLeft":
+                thetaY -= rotation_angle;
+                break;
+            case "ArrowRight":
+                thetaY += rotation_angle;
+                break;
+            case "ArrowUp":
+                thetaX -= rotation_angle;
+                break;
+            case "ArrowDown":
+                thetaX += rotation_angle;
+                break;
+            case "a":
+                scalingFactor = Math.min(scalingFactor + 0.05, 2.0); // Increase scaling factor
+                break;
+            case "s":
+                scalingFactor = Math.max(scalingFactor - 0.05, 0.5); // Decrease scaling factor
+                break;
+        }
+        updateRotationMatrices(); // Update the rotation matrices
+        drawOctahedron(); // Redraw the octahedron
+    };
+
+    updateRotationMatrices(); // Initialize rotation matrices
+    drawOctahedron(); // Initial drawing of the octahedron
+</script>
+</html>
